@@ -1,16 +1,27 @@
 import express from "express";
+import { createServer } from "node:http";
+
+
+import connectToSocket from "./config/socket.js";
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const server = createServer(app);
+const io = connectToSocket(server);
+app.use(express.json());
+app.use(cors({
+    origin: "*",
+    credentials: true
+}));
 
-// app.use(express.json());
+app.set("port", (process.env.PORT || 8080));
+
 app.get("/", (req, res) => {
-  res.send("Hello, World!");
+    res.send("Hello, World!");
 });
 
 app.use("/api/meeting", require("./routes/meetingRoutes"));
 
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+server.listen(app.get("port"), () => {
+    console.log("listening to the port 8080");
 });
