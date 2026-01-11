@@ -1,5 +1,5 @@
-const store = require("../store/meetingStore");
-const { randomUUID } = require('crypto'); // ✅ Node.js built-in
+import store from "../store/meetingStore.js";
+import { randomUUID } from "crypto";
 
 // Create meeting
 export const createMeeting = (req, res) => {

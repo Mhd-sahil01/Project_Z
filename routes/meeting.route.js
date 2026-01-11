@@ -1,5 +1,4 @@
 import express from "express";
-
 import { createMeeting, joinMeeting, leaveMeeting , endMeeting } from "../controllers/meetingController.js";
 
 const meetingRouter = express.Router();
