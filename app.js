@@ -25,6 +25,24 @@ app.get("/", (req, res) => {
 app.use("/api/meeting", meetingRoute);
 app.use("/api/auth", authRoute);
 
+io.on("connection", (socket) => {
+    console.log("🟢 Socket connected:", socket.id);
+
+    socket.on("join-meeting", ({ meetingId, userId }) => {
+        socket.join(meetingId);
+        socket.to(meetingId).emit("user-joined", userId);
+    });
+
+    socket.on("leave-meeting", ({ meetingId, userId }) => {
+        socket.leave(meetingId);
+        socket.to(meetingId).emit("user-left", userId);
+    });
+
+    socket.on("end-meeting", ({ meetingId }) => {
+        io.to(meetingId).emit("meeting-ended");
+    });
+});
+
 
 server.listen(app.get("port"), () => {
     console.log("listening to the port 8080");

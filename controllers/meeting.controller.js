@@ -1,8 +1,8 @@
 const store = require("../store/meetingStore");
-const { randomUUID } = require('crypto'); // ✅ Node.js built-in
+import { randomUUID } from 'crypto'; // ✅ Node.js built-in ESM import
 
 // Create meeting
-exports.createMeeting = (req, res) => {
+export const createMeeting = (req, res) => {
     const meetingId = randomUUID();
     store.set(meetingId, {
         participants: new Set(),
@@ -12,7 +12,7 @@ exports.createMeeting = (req, res) => {
 };
 
 // Join meeting
-exports.joinMeeting = (req, res) => {
+export const joinMeeting = (req, res) => {
     const { meetingId, userId } = req.body;
     const meeting = store.get(meetingId);
     if (!meeting || !meeting.active) {
@@ -23,7 +23,7 @@ exports.joinMeeting = (req, res) => {
 };
 
 // Leave meeting
-exports.leaveMeeting = (req, res) => {
+export const leaveMeeting = (req, res) => {
     const { meetingId, userId } = req.body;
     const meeting = store.get(meetingId);
     meeting?.participants.delete(userId);
@@ -31,7 +31,7 @@ exports.leaveMeeting = (req, res) => {
 };
 
 // End meeting
-exports.endMeeting = (req, res) => {
+export const endMeeting = (req, res) => {
     const { meetingId } = req.body;
     const meeting = store.get(meetingId);
     if (meeting) meeting.active = false;
