@@ -1,5 +1,5 @@
 const store = require("../store/meetingStore");
-const { randomUUID } = require('crypto'); // ✅ Node.js built-in
+const { randomUUID } = require('crypto'); // ✅
 
 // Create meeting
 exports.createMeeting = (req, res) => {
