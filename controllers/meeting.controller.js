@@ -1,39 +1,57 @@
-import meetings from "../store/meetingStore.js";
-import { randomUUID } from "crypto";
+import Meeting from "../models/Meeting.js";
 
-// Create meeting
-export const createMeeting = (req, res) => {
-    const meetingId = randomUUID();
-    meetings.set(meetingId, {
-        participants: new Set(),
-        active: true,
-    });
-    res.json({ meetingId });
-};
-
-// Join meeting
-export const joinMeeting = (req, res) => {
-    const { meetingId, userId } = req.body;
-    const meeting = meetings.get(meetingId);
-    if (!meeting || !meeting.active) {
-        return res.status(400).json({ error: "Meeting not active" });
-    }
-    meeting.participants.add(userId);
-    res.json({ joined: true });
-};
-
-// Leave meeting
-export const leaveMeeting = (req, res) => {
-    const { meetingId, userId } = req.body;
-    const meeting = meetings.get(meetingId);
-    meeting?.participants.delete(userId);
-    res.json({ left: true });
-};
-
-// End meeting
-export const endMeeting = (req, res) => {
+export const createMeeting = async (req, res) => {
+  try {
     const { meetingId } = req.body;
-    const meeting = meetings.get(meetingId);
-    if (meeting) meeting.active = false;
-    res.json({ ended: true });
+
+    const meeting = await Meeting.create({
+      meetingId,
+      host: req.user?.id || "000000000000000000000000",
+      participants: [req.user?.id || "000000000000000000000000"],
+    });
+
+    res.status(201).json(meeting);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const joinMeeting = async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+
+    const meeting = await Meeting.findOne({ meetingId });
+    if (!meeting) {
+      return res.status(404).json({ message: "Meeting not found" });
+    }
+
+    meeting.participants.push(
+      req.user?.id || "000000000000000000000000"
+    );
+    await meeting.save();
+
+    res.json(meeting);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const leaveMeeting = async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+
+    const meeting = await Meeting.findOne({ meetingId });
+    if (!meeting) {
+      return res.status(404).json({ message: "Meeting not found" });
+    }
+
+    meeting.participants = meeting.participants.filter(
+      (id) => id.toString() !== (req.user?.id || "")
+    );
+
+    await meeting.save();
+    res.json({ message: "Left meeting successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
