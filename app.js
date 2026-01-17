@@ -9,13 +9,21 @@ import connectToSocket from "./config/socket.js";
 import meetingRoute from "./routes/meeting.route.js";
 import authRoute from "./routes/auth.route.js";
 
+/* ===============================
+   ENV & DATABASE (FIRST)
+================================ */
 dotenv.config();
 connectDB();
 
+/* ===============================
+   APP & SERVER
+================================ */
 const app = express();
 const server = createServer(app);
 
-// middleware
+/* ===============================
+   MIDDLEWARE
+================================ */
 app.use(express.json());
 app.use(
   cors({
@@ -24,23 +32,21 @@ app.use(
   })
 );
 
-// socket.io
-const io = connectToSocket(server);
-
-// port
-const PORT = process.env.PORT || 8080;
-app.set("port", PORT);
-
-// test route
+/* ===============================
+   ROUTES
+================================ */
 app.get("/", (req, res) => {
   res.send("Hello, World!");
 });
 
-// routes
 app.use("/api/meeting", meetingRoute);
 app.use("/api/auth", authRoute);
 
-// socket events
+/* ===============================
+   SOCKET.IO
+================================ */
+const io = connectToSocket(server);
+
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
 
@@ -63,7 +69,11 @@ io.on("connection", (socket) => {
   });
 });
 
-// start server
+/* ===============================
+   START SERVER (LAST)
+================================ */
+const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

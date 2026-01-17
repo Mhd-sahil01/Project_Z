@@ -1,11 +1,15 @@
 import express from "express";
-import { createMeeting, joinMeeting, leaveMeeting , endMeeting } from "../controllers/meeting.controller.js";
+import authMiddleware from "../middleware/auth.middleware.js";
+import {
+  createMeeting,
+  joinMeeting,
+  leaveMeeting,
+} from "../controllers/meeting.controller.js";
 
-const meetingRouter = express.Router();
+const router = express.Router();
 
-meetingRouter.post("/create", createMeeting);
-meetingRouter.post("/:meetingId/join", joinMeeting);
-meetingRouter.post("/:meetingId/leave", leaveMeeting);
-meetingRouter.post("/:meetingId/end", endMeeting);
+router.post("/create", authMiddleware, createMeeting);
+router.post("/join/:meetingId", authMiddleware, joinMeeting);
+router.post("/leave/:meetingId", authMiddleware, leaveMeeting);
 
-export default meetingRouter;
+export default router;
