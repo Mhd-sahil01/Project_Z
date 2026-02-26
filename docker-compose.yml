@@ -9,14 +9,20 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: project_z
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-project_z}
     volumes:
       - mongodb_data:/data/db
       - ./backend/scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     networks:
       - project_z_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Backend API Server
   backend:
@@ -28,21 +34,28 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - NODE_ENV=production
-      - PORT=8000
-      - MONGODB_URI=mongodb://admin:password@mongodb:27017/project_z?authSource=admin
-      - JWT_SECRET=your_production_jwt_secret_here
-      - LIVEKIT_API_KEY=devkey
-      - LIVEKIT_API_SECRET=secret
-      - LIVEKIT_HOST=http://livekit-server:7880
-      - FRONTEND_URL=http://localhost:3000
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${PORT:-8000}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:password@mongodb:27017/project_z?authSource=admin}
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_here}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - LIVEKIT_HOST=${LIVEKIT_HOST:-http://livekit-server:7880}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - ./backend:/app/src
+      - backend_node_modules:/app/node_modules
     networks:
       - project_z_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # LiveKit Server
   livekit-server:
@@ -54,11 +67,11 @@ services:
       - "7881:7881"  # HTTP API
       - "50000-50050:50000-50050/udp"  # UDP ports for WebRTC
     environment:
-      - LIVEKIT_KEYS=devkey:secret
-      - REDIS_ADDRESS=redis:6379
+      - LIVEKIT_KEYS=${LIVEKIT_API_KEY:-devkey}:${LIVEKIT_API_SECRET:-secret}
+      - REDIS_ADDRESS=${REDIS_ADDRESS:-redis:6379}
     command: [
-      "--keys", "devkey:secret",
-      "--redis", "redis:6379",
+      "--keys", "${LIVEKIT_API_KEY:-devkey}:${LIVEKIT_API_SECRET:-secret}",
+      "--redis", "${REDIS_ADDRESS:-redis:6379}",
       "--node-ip", "livekit-server"
     ]
     depends_on:
@@ -77,6 +90,12 @@ services:
       - redis_data:/data
     networks:
       - project_z_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Frontend Application
   frontend:
@@ -88,17 +107,25 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - REACT_APP_SERVER_URL=http://localhost:8000
-      - REACT_APP_LIVEKIT_URL=ws://localhost:7880
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+      - REACT_APP_SERVER_URL=${REACT_APP_SERVER_URL:-http://localhost:8000}
+      - REACT_APP_LIVEKIT_URL=${REACT_APP_LIVEKIT_URL:-ws://localhost:7880}
     depends_on:
-      - backend
-      - livekit-server
+      backend:
+        condition: service_healthy
+      livekit-server:
+        condition: service_started
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend:/app/src
+      - frontend_node_modules:/app/node_modules
     networks:
       - project_z_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Nginx Reverse Proxy (Optional)
   nginx:
@@ -121,6 +148,8 @@ services:
 volumes:
   mongodb_data:
   redis_data:
+  backend_node_modules:
+  frontend_node_modules:
 
 networks:
   project_z_network:

@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose"; // Import mongoose
+import { sendSuccess, sendValidationError, sendConflictError, sendUnauthorizedError, sendInternalServerError } from "../middleware/responseFormatter.js";
 
 // In-memory user storage for development
 let inMemoryUsers = [];
@@ -27,7 +28,7 @@ export const register = async (req, res) => {
 
     // check required fields
     if (!username || !email || !password)
-        return res.status(httpStatus.BAD_REQUEST).json({ message: "All fields are required" });
+        return sendValidationError(res, "All fields are required");
 
     try {
         let user;
@@ -38,7 +39,7 @@ export const register = async (req, res) => {
             // Use MongoDB
             const existingUser = await User.findOne({ $or: [{ email }, { username }] });
             if (existingUser)
-                return res.status(httpStatus.CONFLICT).json({ message: "User already exists" });
+                return sendConflictError(res, "User already exists");
             
             const hashedPassword = await bcrypt.hash(password, 10);
             user = new User({ username, email, password: hashedPassword });
@@ -48,7 +49,7 @@ export const register = async (req, res) => {
             // Use in-memory storage
             const existingUser = inMemoryUsers.find(u => u.email === email || u.username === username);
             if (existingUser)
-                return res.status(httpStatus.CONFLICT).json({ message: "User already exists" });
+                return sendConflictError(res, "User already exists");
             
             const hashedPassword = await bcrypt.hash(password, 10);
             user = {
@@ -62,30 +63,29 @@ export const register = async (req, res) => {
 
         // JWT token
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: '7d' });
-        // Set cookie
-        res.cookie('token', token, { // Set cookie
+        
+        // Set secure cookie
+        const isProduction = process.env.NODE_ENV === 'production';
+        res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/'
         });
 
         // Respond with user data
-        res.status(httpStatus.CREATED).json({
-            success: true, 
-            message: "User registered successfully",
+        return sendSuccess(res, "User registered successfully", {
             token, // Include token in response for localStorage
             user: {
                 id: user._id,
                 username: user.username,
                 email: user.email
             }
-        });
+        }, httpStatus.CREATED);
     } catch (error) {
         console.log("error in Register controller:", error);
-        res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ 
-            message: error.message || "Registration failed. Please try again." 
-        });
+        return sendInternalServerError(res, error.message || "Registration failed. Please try again.");
     }
 };
 
@@ -94,7 +94,7 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
     // Check required fields
     if (!email || !password)
-        return res.status(httpStatus.BAD_REQUEST).json({ message: "All fields are required" });
+        return sendValidationError(res, "All fields are required");
 
     try {
         let user;
@@ -110,27 +110,28 @@ export const login = async (req, res) => {
             user = inMemoryUsers.find(u => u.email === email);
         }
         
-        if (!user) return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid email or password" });
+        if (!user) return sendUnauthorizedError(res, "Invalid email or password");
 
         // Compare passwords
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch)
-            return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid email or password" });
+            return sendUnauthorizedError(res, "Invalid email or password");
 
         // JWT token
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'fallback-secret', { expiresIn: '7d' });
-        // Set cookie
+        
+        // Set secure cookie
+        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/'
         });
 
         // Respond with user data
-        res.status(httpStatus.OK).json({
-            success: true, 
-            message: "Login successfully",
+        return sendSuccess(res, "Login successful", {
             token, // Include token in response for localStorage
             user: {
                 id: user._id,
@@ -140,9 +141,7 @@ export const login = async (req, res) => {
         });
     } catch (error) {
         console.log("error in login controller:", error);
-        res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ 
-            message: error.message || "Login failed. Please try again." 
-        });
+        return sendInternalServerError(res, error.message || "Login failed. Please try again.");
     }
 };
 
@@ -150,16 +149,17 @@ export const login = async (req, res) => {
 export const logout = (req, res) => {
     try {
         // Clear the cookie for logout
+        const isProduction = process.env.NODE_ENV === 'production';
         res.clearCookie('token', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+            path: '/'
         });
         // Respond successfully
-        res.status(httpStatus.OK).json({ message: "Logout successfully" })
+        return sendSuccess(res, "Logout successful");
     } catch (error) {
         console.log("error in logout controller");
-        res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message });
+        return sendInternalServerError(res, error.message);
     }
 };
